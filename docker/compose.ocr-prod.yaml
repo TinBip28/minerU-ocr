@@ -1,0 +1,63 @@
+# MinerU OCR Production Compose - Vietnamese Edition
+# Optimized for text/table/seal OCR without VLM overhead
+#
+# Usage:
+#   docker compose -f docker/compose.ocr-prod.yaml up
+#   docker compose -f docker/compose.ocr-prod.yaml up -d  # daemon mode
+
+services:
+  mineru-ocr-api:
+    image: mineru-ocr-vi:prod
+    container_name: mineru-ocr-api
+    restart: unless-stopped
+
+    ports:
+      - "8000:8000"
+
+    environment:
+      MINERU_MODEL_SOURCE: local
+      MINERU_DEVICE_MODE: cuda
+
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/v1/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    # Resource limits
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["0"]  # Modify for multi-GPU: ["0", "1", "2"]
+              capabilities: [gpu]
+
+    # IPC mode for CUDA shared memory
+    ipc: host
+
+    # ulimits for CUDA
+    ulimits:
+      memlock: -1
+      stack: 67108864
+
+    volumes:
+      # Mount for model cache persistence (optional)
+      # - mineru-models:/root/.cache
+      #
+      # Mount for input/output (optional)
+      # - ./data:/data
+
+    command:
+      - api-server
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --workers
+      - "1"  # Increase for parallel processing
+
+# volumes:
+#   mineru-models:

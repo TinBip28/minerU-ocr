@@ -98,12 +98,22 @@ PDF_EXTRACT_KIT = ModelRepo(
         "modelscope": "OpenDataLab/PDF-Extract-Kit-1.0",
     },
     paths={
+        # Layout models
         "pp_doclayout_v2": "models/Layout/PP-DocLayoutV2",
+        # Formula recognition (if enabled)
         "unimernet_small": "models/MFR/unimernet_hf_small_2503",
+        # OCR folder - for PaddleOCR model loading via .path() method
+        # Note: Use granular paths below for selective download
         "pytorch_paddle": "models/OCR/paddleocr_torch",
-        "slanet_plus": "models/TabRec/SlanetPlus/slanet-plus.onnx",
+        # OCR - Seal detection (granular paths for selective download)
+        # GPU: 114 MB, CPU: 14.5 MB
+        "seal_det_server": "models/OCR/paddleocr_torch/seal_PP-OCRv4_det_server_infer.pth",
+        "seal_det_lite": "models/OCR/paddleocr_torch/seal_PP-OCRv4_det_infer.pth",
+        # Table recognition
+        "slanet_plus": "models/TabRec/SlanetPlus/slanet-plus.onnx",  # 7.76 MB
         "unet_structure": "models/TabRec/UnetStructure/unet.onnx",
-        "paddle_table_cls": "models/TabCls/paddle_table_cls/PP-LCNet_x1_0_table_cls.onnx",
+        # Table classification
+        "paddle_table_cls": "models/TabCls/paddle_table_cls/PP-LCNet_x1_0_table_cls.onnx",  # 6.78 MB
     },
 )
 
