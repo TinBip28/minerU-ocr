@@ -95,11 +95,11 @@ class VietOCRSeq2SeqRecognizer:
 
         if hasattr(predictor, "predict_batch"):
             # Batch inference: process in chunks
+            # VietOCR predict_batch returns (texts: list[str], probs: list[float|None])
             for start in range(0, len(images), self.batch_size):
                 batch = images[start : start + self.batch_size]
-                batch_results = predictor.predict_batch(batch, return_prob=True)
-                # batch_results is list of (text, prob) tuples
-                for text, prob in batch_results:
+                texts, probs = predictor.predict_batch(batch, return_prob=True)
+                for text, prob in zip(texts, probs):
                     normalized_text = str(text or "")
                     # Handle prob: can be float, numpy array, or None
                     if prob is None:

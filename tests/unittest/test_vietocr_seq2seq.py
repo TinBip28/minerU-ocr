@@ -31,18 +31,22 @@ class RecordingPredictor:
 
     def predict_batch(
         self, images: list[Image.Image], return_prob: bool = False
-    ) -> list[tuple[str, float]]:
-        """Record batch prediction."""
+    ) -> tuple[list[str], list[float]] | list[str]:
+        """Record batch prediction.
+
+        Returns (texts, probs) tuple matching VietOCR's actual API.
+        """
         self.batch_calls.append(images)
-        results = []
+        texts = []
+        probs = []
         for _ in range(len(images)):
             text, prob = next(self.predictions)
+            texts.append(text)
             if return_prob:
-                prob_value = prob if prob is not None else (1.0 if text else 0.0)
-                results.append((text, prob_value))
-            else:
-                results.append((text, 1.0))
-        return results
+                probs.append(prob if prob is not None else (1.0 if text else 0.0))
+        if return_prob:
+            return texts, probs
+        return texts
 
 
 class TestCropConversion:

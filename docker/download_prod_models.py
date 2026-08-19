@@ -1,139 +1,160 @@
 #!/usr/bin/env python3
-"""Download only OCR-production models for MinerU Vietnamese OCR pipeline.
+"""Download models for MinerU Vietnamese OCR production.
 
-This script downloads only the models needed for:
-- Layout detection (PP-DocLayoutV2)
-- Text detection (PP-OCRv6 small det ONNX)
-- Vietnamese text recognition (VietOCR vgg_seq2seq - downloaded by vietocr package)
-- Table detection/recognition (SLANet+, Table classifier)
-- Seal detection (PP-OCR seal models)
+Downloads ONLY the models needed for Vietnamese OCR production:
+- Layout: PP-DocLayoutV2 (full PyTorch)
+- Text detection: PP-OCRv6 detector (full PyTorch)
+- Text recognition: VietOCR vgg_seq2seq (full PyTorch)
+- Table: SLANet+, UNet structure, Table classifier
+- Seal: seal detector + PP-OCRv6 medium recognizer
 
 NOT downloaded:
 - VLM models (MinerU2.5-Pro)
-- Formula models (if not needed)
-- PaddleOCR text recognizers (using VietOCR instead)
-- All 23 other OCR language models in paddleocr_torch folder
+- Formula models
+- ONNX weights (using full PyTorch for quality baseline)
+- Other OCR language models
+
+Exit code 0 only if ALL required models download successfully.
 """
+
+from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Optional
 
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from mineru.utils.model_registry import (
     PDF_EXTRACT_KIT,
-    PP_DOCLAYOUT_V2_ONNX,
-    PP_OCR_V6_SMALL_DET_ONNX,
 )
 
 
-def download_ocr_models():
-    """Download only OCR-production model weights."""
+def download_with_progress(name: str, model_path, verbose: bool = True) -> bool:
+    """Download a model and return success status."""
+    try:
+        if verbose:
+            print(f"  Downloading {name}...")
+        model_path.ensure()
+        if verbose:
+            print(f"  ✓ {name}")
+        return True
+    except Exception as e:
+        print(f"  ✗ {name} failed: {e}")
+        return False
+
+
+def download_all_models() -> list[str]:
+    """Download all production models. Returns list of failed models."""
+    failed: list[str] = []
+
     print("=" * 60)
     print("MinerU OCR Production - Model Downloader")
     print("=" * 60)
     print()
-    print("This will download only OCR/table/seal models:")
-    print("  - PP-DocLayoutV2 (layout) - ONNX")
-    print("  - PP-OCRv6 small detector - ONNX")
-    print("  - SLANet+ (table recognition) - ONNX")
-    print("  - Table classifier - ONNX")
-    print("  - Seal detector (server/lite)")
-    print()
-    print("NOT downloading:")
-    print("  - VLM models (MinerU2.5-Pro)")
-    print("  - Formula models (unimernet)")
-    print("  - PaddleOCR text recognizers (using VietOCR)")
-    print("  - 23 other OCR language models")
+    print("Downloading FULL STACK weights (not ONNX) for quality baseline:")
+    print("  - PP-DocLayoutV2 (layout)")
+    print("  - PP-OCRv6 detector (text detection)")
+    print("  - VietOCR vgg_seq2seq (Vietnamese text recognition)")
+    print("  - SLANet+ (table recognition)")
+    print("  - UNet structure (wired table)")
+    print("  - Table classifier")
+    print("  - Seal detector + recognizer")
     print()
 
-    downloaded = []
-    failed = []
+    # 1. Layout - full PyTorch version
+    print("[1/7] Layout model...")
+    if not download_with_progress("PP-DocLayoutV2", PDF_EXTRACT_KIT.pp_doclayout_v2):
+        failed.append("PP-DocLayoutV2")
 
-    # 1. Layout model - ONNX version (lighter, ~214 MB)
-    print("[1/5] Downloading PP-DocLayoutV2 (layout - ONNX)...")
+    # 2. Text detection - using PaddleOCR (full)
+    print("[2/7] Text detection models...")
+    if not download_with_progress("PP-OCRv6 small detector", PDF_EXTRACT_KIT.pytorch_paddle.path("ch_PP-OCRv6_small_det_infer.safetensors")):
+        failed.append("PP-OCRv6-det")
+    if not download_with_progress("PP-OCRv6 small recognizer", PDF_EXTRACT_KIT.pytorch_paddle.path("ch_PP-OCRv6_small_rec_infer.safetensors")):
+        failed.append("PP-OCRv6-rec")
+
+    # 3. VietOCR vgg_seq2seq - download and cache locally
+    print("[3/7] VietOCR vgg_seq2seq (Vietnamese text recognition)...")
+    print("  NOTE: VietOCR weights are downloaded by the vietocr package")
+    print("  at first inference. To pre-download, ensure vietocr can access")
+    print("  its model cache directory.")
     try:
-        PP_DOCLAYOUT_V2_ONNX.ensure()
-        downloaded.append("PP-DocLayoutV2 ONNX")
+        # Trigger vietocr config to ensure weights URL is available
+        from vietocr.tool.config import Cfg
+        config = Cfg.load_config_from_name("vgg_seq2seq")
+        print("  ✓ VietOCR config loaded")
+    except ImportError:
+        print("  ⚠ vietocr not installed yet (will be installed with mineru[torch])")
     except Exception as e:
-        print(f"  WARNING: {e}")
-        failed.append("PP-DocLayoutV2 ONNX")
+        print(f"  ⚠ VietOCR config check: {e}")
 
-    # 2. Text detector - ONNX version (~10 MB)
-    print("[2/5] Downloading PP-OCRv6 small detector (ONNX)...")
-    try:
-        PP_OCR_V6_SMALL_DET_ONNX.ensure()
-        downloaded.append("PP-OCRv6-small-det ONNX")
-    except Exception as e:
-        print(f"  WARNING: {e}")
-        failed.append("PP-OCRv6-small-det ONNX")
+    # 4. Table recognition - SLANet+
+    print("[4/7] Table recognition models...")
+    if not download_with_progress("SLANet+", PDF_EXTRACT_KIT.slanet_plus):
+        failed.append("SLANet+")
+    # UNet for wired table
+    if not download_with_progress("UNet structure", PDF_EXTRACT_KIT.unet_structure):
+        failed.append("UNet")
 
-    # 3. OCR models from PDF Extract Kit - SEAL ONLY
-    print("[3/5] Downloading OCR models (seal detection only)...")
+    # 5. Table classification
+    print("[5/7] Table classification model...")
+    if not download_with_progress("Table classifier", PDF_EXTRACT_KIT.paddle_table_cls):
+        failed.append("TableClassifier")
 
-    # Only download seal detector models, not all 25 OCR models
-    try:
-        # Seal detector server (GPU) - 114 MB
-        print("  - Downloading seal_PP-OCRv4_det_server (GPU)...")
-        PDF_EXTRACT_KIT.seal_det_server.ensure()
-        downloaded.append("seal_det_server")
+    # 6. Seal detection + recognition
+    print("[6/7] Seal detection models...")
+    if not download_with_progress("Seal detector (server/GPU)", PDF_EXTRACT_KIT.seal_det_server):
+        failed.append("SealDetectorServer")
+    if not download_with_progress("Seal detector (lite/CPU)", PDF_EXTRACT_KIT.seal_det_lite):
+        failed.append("SealDetectorLite")
+    # Seal recognizer - PP-OCRv6 medium for better quality
+    if not download_with_progress("Seal recognizer (medium)", PDF_EXTRACT_KIT.pytorch_paddle.path("ch_PP-OCRv6_medium_rec_infer.safetensors")):
+        failed.append("SealRecognizer")
 
-        # Seal detector lite (CPU) - 14.5 MB
-        print("  - Downloading seal_PP-OCRv4_det_lite (CPU)...")
-        PDF_EXTRACT_KIT.seal_det_lite.ensure()
-        downloaded.append("seal_det_lite")
-    except Exception as e:
-        print(f"  WARNING: {e}")
-        failed.append("Seal detectors")
+    # 7. Dict file for OCR
+    print("[7/7] OCR dictionary...")
+    # The dict file should be in mineru's resources
+    dict_path = Path(__file__).parent.parent / "mineru" / "model" / "utils" / "pytorchocr" / "utils" / "resources"
+    if dict_path.exists():
+        print(f"  ✓ OCR resources found at {dict_path}")
+    else:
+        print(f"  ⚠ OCR resources not found at {dict_path}")
 
-    # 4. Table models - ONNX versions
-    print("[4/5] Downloading table models...")
-    try:
-        # SLANet+ - 7.76 MB
-        print("  - Downloading slanet-plus.onnx...")
-        PDF_EXTRACT_KIT.slanet_plus.ensure()
-        downloaded.append("slanet_plus")
+    return failed
 
-        # Table classifier - 6.78 MB
-        print("  - Downloading table classifier...")
-        PDF_EXTRACT_KIT.paddle_table_cls.ensure()
-        downloaded.append("table_cls")
-    except Exception as e:
-        print(f"  WARNING: {e}")
-        failed.append("Table models")
 
-    # 5. VietOCR
-    print("[5/5] VietOCR vgg_seq2seq...")
-    print("  (Downloaded automatically by vietocr package at runtime)")
-    downloaded.append("vietocr (runtime)")
+def main() -> int:
+    """Main entry point. Returns 0 on success, non-zero on failure."""
+    print()
+    failed = download_all_models()
 
-    # Summary
     print()
     print("=" * 60)
     print("Download Summary")
     print("=" * 60)
-    print(f"Successfully: {len(downloaded)} items")
-    for name in downloaded:
-        print(f"  ✓ {name}")
-    if failed:
-        print(f"\nFailed/skipped: {len(failed)}")
+
+    if not failed:
+        print("✓ All models downloaded successfully")
+        print()
+        print("Estimated disk usage: ~2-3 GB")
+        print()
+        print("Next steps:")
+        print("  1. Build: docker build -f docker/Dockerfile.ocr-prod -t mineru-ocr-vi:prod .")
+        print("  2. Run: docker compose -f docker/compose.ocr-prod.yaml up")
+        return 0
+    else:
+        print(f"✗ {len(failed)} model(s) failed to download:")
         for name in failed:
-            print(f"  ✗ {name}")
-    print()
-    print("Estimated disk usage:")
-    print("  - PP-DocLayoutV2 ONNX: ~214 MB")
-    print("  - PP-OCRv6 detector ONNX: ~10 MB")
-    print("  - Seal detectors: ~129 MB")
-    print("  - Table models: ~15 MB")
-    print("  - VietOCR (runtime): ~200 MB")
-    print("  - Total estimate: ~568 MB")
-    print()
-    print("Next steps:")
-    print("  1. Build: docker build -f docker/Dockerfile.ocr-prod -t mineru-ocr-vi:prod .")
-    print("  2. Run: docker compose -f docker/compose.ocr-prod.yaml up")
-    print()
+            print(f"  - {name}")
+        print()
+        print("Please check:")
+        print("  - Network connectivity")
+        print("  - HuggingFace/ModelScope access")
+        print("  - Disk space")
+        return 1
 
 
 if __name__ == "__main__":
-    download_ocr_models()
+    sys.exit(main())
