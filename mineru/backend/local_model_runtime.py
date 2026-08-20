@@ -351,6 +351,9 @@ class HybridLocalModelContext:
         # 初始化layout模型，用于提供行内公式检测框和Hybrid标题拆分
         self.layout_model = self.get_layout_model()
 
+        # Initialize MFR model only if formula recognition is enabled
+        # Always set mfr_model to None first for stable object contract
+        self.mfr_model = None
         if formula_enable:
             # 初始化公式解析模型
             self.mfr_model = self.get_mfr_model()

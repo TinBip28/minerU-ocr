@@ -1456,12 +1456,17 @@ def _extract_with_local_layout(
         batch_size=min(8, batch_ratio * LAYOUT_BASE_BATCH_SIZE),
     )
     clean_vram(local_context.device, vram_threshold=8)
-    mfd_res = _run_medium_formula_recognition(
-        local_context,
-        images_layout_res,
-        np_images,
-        batch_ratio,
-    )
+    # MFR: only run if formula_enable=True
+    if formula_enable:
+        mfd_res = _run_medium_formula_recognition(
+            local_context,
+            images_layout_res,
+            np_images,
+            batch_ratio,
+        )
+    else:
+        # Skip MFR - return empty results for all pages
+        mfd_res = [[] for _ in images_layout_res]
     clean_vram(local_context.device, vram_threshold=8)
     _apply_medium_table_recognition(
         local_context,

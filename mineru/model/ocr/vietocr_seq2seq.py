@@ -122,6 +122,6 @@ class VietOCRSeq2SeqRecognizer:
                     normalized_score = float(prob)
                 results.append((normalized_text, normalized_score))
 
-        elapsed = (perf_counter() - started_at) * 1000  # ms
+        elapsed = perf_counter() - started_at  # seconds (matching MinerU OCR contract)
 
         return results, elapsed

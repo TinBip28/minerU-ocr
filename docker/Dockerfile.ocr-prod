@@ -42,7 +42,17 @@ COPY docker/download_prod_models.py /app/docker/download_prod_models.py
 RUN python3 /app/docker/download_prod_models.py
 
 ENV MINERU_MODEL_SOURCE=local
+ENV MINERU_MODEL_STACK=full
+ENV MINERU_FORMULA_ENABLE=false
+ENV MINERU_DEVICE_MODE=cuda
 
-# Default command: start API server
+# Default command: start API server with production defaults
 ENTRYPOINT ["mineru-kit"]
-CMD ["api-server", "--host", "0.0.0.0", "--port", "8000"]
+CMD [
+    "api-server",
+    "--host", "0.0.0.0",
+    "--port", "8000",
+    "--tier", "basic",
+    "--language", "vi",
+    "--concurrency", "1"
+]
