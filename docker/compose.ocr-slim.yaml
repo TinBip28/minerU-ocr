@@ -1,0 +1,76 @@
+# MinerU OCR Production Compose - Optimized Slim Version
+# Usage:
+#   docker compose -f docker/compose.ocr-slim.yaml up
+#   docker compose -f docker/compose.ocr-slim.yaml up -d
+#
+# For first run, models will be downloaded automatically.
+
+services:
+  mineru-ocr-api:
+    image: mineru-ocr-vi:slim
+    container_name: mineru-ocr-api
+    restart: unless-stopped
+
+    ports:
+      - "8000:8000"
+
+    environment:
+      MINERU_MODEL_SOURCE: local
+      MINERU_DEVICE_MODE: cuda
+      MINERU_MODEL_STACK: full
+      MINERU_FORMULA_ENABLE: "false"
+
+    # Health check
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python3 -c \"import httpx; r=httpx.get('http://127.0.0.1:8000/v1/health', timeout=5); exit(0 if r.is_success else 1)\"",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+    # GPU support
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["0"]
+              capabilities: [gpu]
+
+    ipc: host
+    ulimits:
+      memlock: -1
+      stack: 67108864
+
+    volumes:
+      # Models persistent volume
+      - mineru-models:/root/.cache
+
+      # Optional: input/output directories
+      # - ./data:/data
+      # - ./output:/output
+
+    command:
+      - api-server
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --tier
+      - basic
+      - --language
+      - vi
+      - --concurrency
+      - "1"
+
+volumes:
+  mineru-models:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/models

@@ -61,3 +61,8 @@ output/.coverage
 htmlcov/
 *.pth
 
+# Docker volumes and benchmarks
+models/
+benchmark/input/
+benchmark/results/
+requirements/ocr-prod.txt
