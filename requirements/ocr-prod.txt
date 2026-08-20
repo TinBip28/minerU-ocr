@@ -32,8 +32,9 @@ shapely>=2.0.7,<3
 pyclipper>=1.3.0,<2
 ftfy>=6.3.1,<7
 
-# MinerU internal packages (stub for compatibility)
-mineru-vl-utils>=1.1.1,<2
+# NOTE: mineru-vl-utils is NOT required for OCR production
+#       It's only needed for VLM-based inference (high/xhigh tier)
+#       See: mineru/backend/hybrid/hybrid_analyze.py:_load_vlm_content_block()
 
 # Runtime
 pyyaml>=6.0.1,<7
