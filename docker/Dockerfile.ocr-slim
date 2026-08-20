@@ -24,9 +24,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && ln -sf /usr/bin/python3 /usr/bin/python
 
-# Create non-root user for security
+# Create non-root user and directories
 RUN useradd -m -s /bin/bash mineru && \
-    mkdir -p /app && chown mineru:mineru /app
+    mkdir -p /app /models && \
+    chown -R mineru:mineru /app /models
 
 WORKDIR /app
 
@@ -34,11 +35,8 @@ WORKDIR /app
 COPY --chown=mineru:mineru mineru ./mineru
 COPY --chown=mineru:mineru pyproject.toml README.md LICENSE.md ./
 
-# Copy requirements
-COPY --chown=mineru:mineru requirements/ocr-prod.txt .
-
-# Install Python dependencies
-# Note: torch wheel is downloaded with CUDA support from PyTorch index
+# Copy requirements and install
+COPY --chown=mineru:mineru requirements/ocr-prod.txt ./ocr-prod.txt
 RUN pip install --upgrade pip && \
     pip install -r ocr-prod.txt && \
     pip install --no-deps -e .
@@ -46,25 +44,17 @@ RUN pip install --upgrade pip && \
 # Copy model scripts
 COPY --chown=mineru:mineru docker/download_prod_models.py /app/docker/download_prod_models.py
 COPY --chown=mineru:mineru docker/init-models.sh /app/docker/init-models.sh
+RUN chmod +x /app/docker/init-models.sh
 
 # Switch to non-root user
 USER mineru
 
 # Environment variables
 ENV MINERU_MODEL_SOURCE=local
+ENV MINERU_MODEL_BASE_DIR=/models
 ENV MINERU_MODEL_STACK=full
 ENV MINERU_FORMULA_ENABLE=false
 ENV MINERU_DEVICE_MODE=cuda
-ENV MINERU_HOME=/models
-ENV MINERU_MODEL_DIR=/models
 
-# Default command
 ENTRYPOINT ["mineru-kit"]
-CMD [
-    "api-server",
-    "--host", "0.0.0.0",
-    "--port", "8000",
-    "--tier", "basic",
-    "--language", "vi",
-    "--concurrency", "1"
-]
+CMD ["api-server", "--host", "0.0.0.0", "--port", "8000", "--tier", "basic", "--language", "vi", "--concurrency", "1"]

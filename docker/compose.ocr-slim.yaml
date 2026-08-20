@@ -1,22 +1,27 @@
 # MinerU OCR Production Compose - Optimized Slim Version
 # Usage:
+#   mkdir -p models
+#   docker compose -f docker/compose.ocr-slim.yaml run --rm init-models
 #   docker compose -f docker/compose.ocr-slim.yaml up
 #   docker compose -f docker/compose.ocr-slim.yaml up -d
-#
-# For first run, models will be downloaded automatically on first API call.
-# To pre-download models, run: docker compose run --rm init-models
 
 services:
   # Model initialization service (run once before first use)
   init-models:
     image: mineru-ocr-vi:slim
     container_name: mineru-ocr-init
+
+    entrypoint:
+      - /bin/bash
+      - /app/docker/init-models.sh
+
     environment:
-      MINERU_HOME: /models
-      MINERU_MODEL_DIR: /models
+      MINERU_MODEL_SOURCE: auto
+      MINERU_MODEL_BASE_DIR: /models
+
     volumes:
       - mineru-models:/models
-    command: ["python3", "/app/docker/init-models.sh"]
+
     restart: "no"
 
   mineru-ocr-api:
@@ -24,16 +29,19 @@ services:
     container_name: mineru-ocr-api
     restart: unless-stopped
 
+    depends_on:
+      init-models:
+        condition: service_completed_successfully
+
     ports:
       - "8000:8000"
 
     environment:
       MINERU_MODEL_SOURCE: local
+      MINERU_MODEL_BASE_DIR: /models
       MINERU_DEVICE_MODE: cuda
       MINERU_MODEL_STACK: full
       MINERU_FORMULA_ENABLE: "false"
-      MINERU_HOME: /models
-      MINERU_MODEL_DIR: /models
 
     # Health check
     healthcheck:
