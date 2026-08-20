@@ -150,3 +150,22 @@ def get_llm_aided_config() -> dict[str, Any] | None:
     else:
         return llm_aided_config
 
+
+def get_formula_enable(default: bool = True) -> bool:
+    """Return whether Formula Recognition (MFR) is enabled.
+
+    Controlled by environment variable ``MINERU_FORMULA_ENABLE``.
+    Defaults to ``True`` for generic MinerU, but production OCR profile
+    should set ``MINERU_FORMULA_ENABLE=false`` to skip MFR loading.
+
+    Args:
+        default: Default value when env var is not set.
+
+    Returns:
+        True if formula recognition should be enabled.
+    """
+    value = os.getenv("MINERU_FORMULA_ENABLE")
+    if value is None:
+        return default
+    return value.lower() in {"1", "true", "yes", "on"}
+

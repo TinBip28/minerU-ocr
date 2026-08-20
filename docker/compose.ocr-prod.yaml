@@ -18,6 +18,7 @@ services:
       MINERU_MODEL_SOURCE: local
       MINERU_DEVICE_MODE: cuda
       MINERU_MODEL_STACK: full  # Use full stack weights (not ONNX) for quality
+      MINERU_FORMULA_ENABLE: "false"  # Disable formula recognition for OCR production
 
     # Health check - using Python/httpx (already in base image)
     # Avoids needing curl in production image

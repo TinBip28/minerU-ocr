@@ -27,7 +27,7 @@ from ...utils.backend_options import (
     validate_effort,
 )
 from ...utils.bbox_utils import normalize_to_int_bbox
-from ...utils.config_reader import get_device, get_processing_window_size
+from ...utils.config_reader import get_device, get_formula_enable, get_processing_window_size
 from ...utils.enum_class import ImageType
 from ...utils.image_payload import ImagePayloadCache
 from ...utils.model_utils import clean_memory, clean_vram, crop_img, get_vram
@@ -1440,11 +1440,14 @@ def _extract_with_local_layout(
     batch_ratio: int,
 ) -> tuple[list[list[dict[str, Any]]], HybridLocalModelContext]:
     """Hybrid medium 路径：单文件窗口内执行本地 layout/OCR/table/formula，不跨文件 batch。"""
+    # Read formula_enable from config
+    formula_enable = get_formula_enable(default=True)
+    logger.debug(f"Hybrid medium layout: formula_enable={formula_enable}")
+
     local_context_singleton = HybridLocalModelContextSingleton()
     local_context = local_context_singleton.get_model(
         lang=language,
-        # medium 本地路径会直接执行公式识别；OCR 扫描件也需要加载 MFR。
-        formula_enable=True,
+        formula_enable=formula_enable,
     )
     np_images = [np.asarray(pil_image).copy() for pil_image in images_pil_list]
     images_layout_res = run_layout_inference(
@@ -1606,12 +1609,16 @@ def _process_ocr_and_formulas(
     # 将PIL图片转换为numpy数组
     np_images = [np.asarray(pil_image).copy() for pil_image in images_pil_list]
 
+    # Read formula_enable from config
+    formula_enable = get_formula_enable(default=True)
+    logger.debug(f"VLM path: formula_enable={formula_enable}")
+
     if local_context is None:
         # 允许 high 路径复用已经初始化的本地上下文，避免同一窗口重复取模型。
         local_context_singleton = HybridLocalModelContextSingleton()
         local_context = local_context_singleton.get_model(
             lang=language,
-            formula_enable=True,
+            formula_enable=formula_enable,
         )
 
     if images_layout_res is None:
@@ -1619,25 +1626,30 @@ def _process_ocr_and_formulas(
         layout_images = _mask_image_regions(np_images, model_list)
         images_layout_res = _predict_layout_for_title_split(local_context, layout_images, batch_ratio)
 
-    images_mfd_res = _build_inline_formula_inputs(images_layout_res)
-    # 公式识别
-    inline_formula_list = run_mfr_inference(
-        local_context.mfr_model.batch_predict,
-        images_mfd_res,
-        np_images,
-        batch_size=batch_ratio * MFR_BASE_BATCH_SIZE,
-        interline_enable=True,
-    )
+    # Formula recognition - only run if enabled
+    if formula_enable and local_context.mfr_model is not None:
+        images_mfd_res = _build_inline_formula_inputs(images_layout_res)
+        inline_formula_list = run_mfr_inference(
+            local_context.mfr_model.batch_predict,
+            images_mfd_res,
+            np_images,
+            batch_size=batch_ratio * MFR_BASE_BATCH_SIZE,
+            interline_enable=True,
+        )
 
-    mfd_res = []
-    for page_inline_formula_list in inline_formula_list:
-        page_mfd_res = []
-        for formula in page_inline_formula_list:
-            bbox = _formula_item_to_pixel_bbox(formula)
-            if bbox is None:
-                continue
-            page_mfd_res.append({"bbox": bbox})
-        mfd_res.append(page_mfd_res)
+        mfd_res = []
+        for page_inline_formula_list in inline_formula_list:
+            page_mfd_res = []
+            for formula in page_inline_formula_list:
+                bbox = _formula_item_to_pixel_bbox(formula)
+                if bbox is None:
+                    continue
+                page_mfd_res.append({"bbox": bbox})
+            mfd_res.append(page_mfd_res)
+    else:
+        # Formula disabled - skip MFR, use empty results
+        inline_formula_list = [[] for _ in images_layout_res]
+        mfd_res = [[] for _ in images_layout_res]
 
     # vlm没有执行ocr，需要ocr_det
     ocr_res_list = _ocr_det(

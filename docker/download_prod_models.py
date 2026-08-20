@@ -62,6 +62,9 @@ def download_all_models() -> list[str]:
     print("  - Table classifier")
     print("  - Seal detector + recognizer")
     print()
+    print("Formula Recognition (MFR/UniMERNet): DISABLED")
+    print("  - Not downloaded (MINERU_FORMULA_ENABLE=false)")
+    print()
 
     # 1. Layout - full PyTorch version
     print("[1/7] Layout model...")
