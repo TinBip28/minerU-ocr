@@ -17,12 +17,56 @@ Representative PDF samples for regression testing after Docker image changes.
 
 ```bash
 # Run benchmark
-mineru-kit parse --pdf ./benchmark/input --output ./benchmark/results
+mineru-kit parse \
+    ./benchmark/input \
+    -o ./benchmark/results \
+    --tier basic \
+    --language vi \
+    --ocr-mode auto
 
 # Compare with baseline
-diff -rq ./benchmark/results ./benchmark/baseline
+diff -rq ./benchmark/results ./benchmark/baseline/md
+diff -rq ./benchmark/results ./benchmark/baseline/json
 ```
 
-## Baseline Outputs
+## Benchmark Outputs
 
-Place reference markdown and JSON outputs here after verification.
+Place reference markdown and JSON outputs here after verification:
+
+```
+benchmark/
+├── input/
+│   ├── text_vi.pdf
+│   ├── table_complex.pdf
+│   └── ...
+├── baseline/
+│   ├── md/
+│   │   ├── text_vi.md
+│   │   └── ...
+│   └── json/
+│       ├── text_vi.json
+│       └── ...
+└── results/
+    └── ... (output from mineru-kit parse)
+```
+
+## Regression Checklist
+
+After any Docker image change:
+
+- [ ] Text PDFs: CER < baseline, Vietnamese diacritics preserved
+- [ ] Table PDFs: row count, column count, merged cells match
+- [ ] Seal PDFs: seal detected, seal text OCR correct
+- [ ] Mixed PDFs: reading order correct
+- [ ] Degraded PDFs: no crashes, graceful degradation
+
+## Performance Metrics
+
+Record after each benchmark:
+
+- Average sec/page
+- P50 sec/page
+- P95 sec/page
+- Peak GPU VRAM
+- Peak RAM
+- Startup time

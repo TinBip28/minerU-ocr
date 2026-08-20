@@ -65,4 +65,3 @@ htmlcov/
 models/
 benchmark/input/
 benchmark/results/
-requirements/ocr-prod.txt

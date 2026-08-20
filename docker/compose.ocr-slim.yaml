@@ -3,9 +3,22 @@
 #   docker compose -f docker/compose.ocr-slim.yaml up
 #   docker compose -f docker/compose.ocr-slim.yaml up -d
 #
-# For first run, models will be downloaded automatically.
+# For first run, models will be downloaded automatically on first API call.
+# To pre-download models, run: docker compose run --rm init-models
 
 services:
+  # Model initialization service (run once before first use)
+  init-models:
+    image: mineru-ocr-vi:slim
+    container_name: mineru-ocr-init
+    environment:
+      MINERU_HOME: /models
+      MINERU_MODEL_DIR: /models
+    volumes:
+      - mineru-models:/models
+    command: ["python3", "/app/docker/init-models.sh"]
+    restart: "no"
+
   mineru-ocr-api:
     image: mineru-ocr-vi:slim
     container_name: mineru-ocr-api
@@ -19,6 +32,8 @@ services:
       MINERU_DEVICE_MODE: cuda
       MINERU_MODEL_STACK: full
       MINERU_FORMULA_ENABLE: "false"
+      MINERU_HOME: /models
+      MINERU_MODEL_DIR: /models
 
     # Health check
     healthcheck:
@@ -48,7 +63,7 @@ services:
 
     volumes:
       # Models persistent volume
-      - mineru-models:/root/.cache
+      - mineru-models:/models
 
       # Optional: input/output directories
       # - ./data:/data

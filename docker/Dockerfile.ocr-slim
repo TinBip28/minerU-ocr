@@ -30,23 +30,22 @@ RUN useradd -m -s /bin/bash mineru && \
 
 WORKDIR /app
 
-# Copy requirements first (for layer caching)
-COPY --chown=mineru:mineru requirements/ocr-prod.txt .
-
-# Install Python dependencies with CUDA-enabled torch
-# torch wheel is downloaded with CUDA support from PyTorch index
-RUN pip install --upgrade pip && \
-    pip install -r ocr-prod.txt
-
-# Copy project source
+# Copy project source first (needed for package discovery)
 COPY --chown=mineru:mineru mineru ./mineru
 COPY --chown=mineru:mineru pyproject.toml README.md LICENSE.md ./
 
-# Install MinerU from source (no deps, already installed above)
-RUN pip install --no-deps -e . 2>/dev/null || true
+# Copy requirements
+COPY --chown=mineru:mineru requirements/ocr-prod.txt .
 
-# Copy model download script
+# Install Python dependencies
+# Note: torch wheel is downloaded with CUDA support from PyTorch index
+RUN pip install --upgrade pip && \
+    pip install -r ocr-prod.txt && \
+    pip install --no-deps -e .
+
+# Copy model scripts
 COPY --chown=mineru:mineru docker/download_prod_models.py /app/docker/download_prod_models.py
+COPY --chown=mineru:mineru docker/init-models.sh /app/docker/init-models.sh
 
 # Switch to non-root user
 USER mineru
@@ -56,6 +55,8 @@ ENV MINERU_MODEL_SOURCE=local
 ENV MINERU_MODEL_STACK=full
 ENV MINERU_FORMULA_ENABLE=false
 ENV MINERU_DEVICE_MODE=cuda
+ENV MINERU_HOME=/models
+ENV MINERU_MODEL_DIR=/models
 
 # Default command
 ENTRYPOINT ["mineru-kit"]
