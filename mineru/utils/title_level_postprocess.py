@@ -10,7 +10,6 @@ from loguru import logger
 from ..types import PageInfo
 from .backend_options import DEFAULT_HYBRID_EFFORT, validate_effort
 from .config_reader import get_llm_aided_config
-from .llm_aided import llm_aided_title
 
 
 def _resolve_title_aided_config() -> dict[str, Any] | None:
@@ -26,16 +25,21 @@ def _resolve_title_aided_config() -> dict[str, Any] | None:
 
 def apply_title_leveling_to_pdf_info(pdf_info: list[PageInfo]) -> None:
     title_aided_config = _resolve_title_aided_config()
-    if title_aided_config:
-        start_time = time.perf_counter()
-        success = False
-        try:
-            llm_aided_title(pdf_info, title_aided_config)
-            success = True
-        finally:
-            elapsed = time.perf_counter() - start_time
-            status = "finished" if success else "failed"
-            logger.info(f"title leveling {status}, cost: {elapsed:.2f}s")
+    if not title_aided_config:
+        return
+
+    # Lazy import - only load llm_aided when LLM title is actually enabled
+    from .llm_aided import llm_aided_title
+
+    start_time = time.perf_counter()
+    success = False
+    try:
+        llm_aided_title(pdf_info, title_aided_config)
+        success = True
+    finally:
+        elapsed = time.perf_counter() - start_time
+        status = "finished" if success else "failed"
+        logger.info(f"title leveling {status}, cost: {elapsed:.2f}s")
 
 
 def finalize_client_side_pages(pages: list[PageInfo], backend: str, effort: str = DEFAULT_HYBRID_EFFORT) -> None:

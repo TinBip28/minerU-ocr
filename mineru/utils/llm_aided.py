@@ -7,7 +7,6 @@ from typing import Any
 
 import json_repair
 from loguru import logger
-from openai import OpenAI
 
 from ..render.merge import merge_para_text
 from ..types import BBox, Block, BlockType, PageInfo
@@ -167,6 +166,15 @@ def _request_title_levels(
 ) -> dict[int, int] | None:
     if len(title_dict) == 0:
         return {}
+
+    # Lazy import OpenAI only when LLM feature is actually used
+    try:
+        from openai import OpenAI
+    except ImportError as exc:
+        raise RuntimeError(
+            "LLM-aided title leveling requires optional dependency 'openai'. "
+            "Install with: pip install openai"
+        ) from exc
 
     client = OpenAI(
         api_key=title_aided_config["api_key"],
