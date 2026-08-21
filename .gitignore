@@ -65,3 +65,4 @@ htmlcov/
 models/
 benchmark/input/
 benchmark/results/
+docker/compose.yaml
